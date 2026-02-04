@@ -1,0 +1,610 @@
+Jurnal Penyembuhan Pasca Pengkhianatan
+
+<!-- Chosen Palette: Deep Sorrow (#1A1A2E, #16213E), Transition (#906387, #C3A6A0), Healing Light (#E5D9F2, #FFF1DC) -->
+<!-- Application Structure Plan: The app uses a 'Journey Map' dashboard layout. The report content is sectioned into 3 Phases (Darkness, Transition, Light). 
+     1. Hero Section: Sets the emotional tone.
+     2. Insights Panel: Uses Chart.js to visualize the emotional trajectory described in the report (Energy Drain vs. Self-Worth).
+     3. The Path (Main Nav): A grid of the 10 chapters, color-coded by phase. Clicking opens a 'Focus Mode'.
+     4. Focus Mode: Displays chapter content + Interactive Reflection Box.
+     5. Sanctuary: Random Affirmation generator.
+     This structure was chosen to turn passive reading into active 'processing' of the trauma. -->
+<!-- Visualization & Content Choices: 
+     1. Emotional Trajectory Chart (Line Chart): Visualizes the qualitative 'feeling' of each chapter to show progress. Goal: Inform/Analyze. 
+     2. Interactive Reflection Cards: User inputs text to answer the report's questions. Goal: Engagement/Synthesis.
+     3. Affirmation Card: Random selector. Goal: Inspiration.
+     CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visuals are CSS/Canvas/Unicode. -->
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10 Kesalahan Emosional - Interactive Journey</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tailwind Config for Custom Palette -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        deep: {
+                            main: '#1A1A2E',
+                            sec: '#16213E',
+                            text: '#E0E0E0'
+                        },
+                        trans: {
+                            rose: '#906387',
+                            gold: '#C3A6A0',
+                            text: '#FFF'
+                        },
+                        light: {
+                            lav: '#E5D9F2',
+                            sage: '#B8C1A0',
+                            sun: '#FFF1DC',
+                            text: '#2D3436'
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['"Montserrat"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #FFF1DC; /* Warm Sunlight Base */
+            color: #2D3436;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #C3A6A0; 
+            border-radius: 4px;
+        }
+
+        /* Chart Container Utilities */
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 350px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* Glassmorphism for cards */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* Animation utilities */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Kintsugi Element via CSS */
+        .kintsugi-scar {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, #C3A6A0, #FFD700, transparent);
+            height: 2px;
+            width: 100px;
+            transform: rotate(-15deg);
+            opacity: 0.6;
+        }
+
+        .active-tab {
+            border-bottom: 3px solid #906387;
+            font-weight: 600;
+            color: #1A1A2E;
+        }
+        .inactive-tab {
+            color: #888;
+            cursor: pointer;
+        }
+        .inactive-tab:hover {
+            color: #906387;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- NAVIGATION -->
+    <nav class="w-full glass-panel sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center gap-3 cursor-pointer" onclick="app.navigate('home')">
+                    <div class="h-8 w-8 rounded-full bg-trans-rose flex items-center justify-center text-white font-serif italic font-bold">K</div>
+                    <span class="font-serif font-bold text-xl text-deep-main tracking-wide">Pulih & Utuh</span>
+                </div>
+                <div class="hidden sm:flex space-x-8">
+                    <button onclick="app.navigate('home')" id="nav-home" class="active-tab px-1 pt-1 text-sm uppercase tracking-widest transition">Beranda</button>
+                    <button onclick="app.navigate('journey')" id="nav-journey" class="inactive-tab px-1 pt-1 text-sm uppercase tracking-widest transition">Perjalanan</button>
+                    <button onclick="app.navigate('affirmations')" id="nav-affirmations" class="inactive-tab px-1 pt-1 text-sm uppercase tracking-widest transition">Afirmasi</button>
+                </div>
+                <!-- Mobile Menu Button -->
+                <div class="sm:hidden flex items-center">
+                    <button onclick="document.getElementById('mobile-menu').classList.toggle('hidden')" class="text-deep-main hover:text-trans-rose focus:outline-none">
+                        <span class="text-2xl">☰</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden sm:hidden glass-panel border-t border-gray-200">
+            <div class="pt-2 pb-4 space-y-1">
+                <button onclick="app.navigate('home')" class="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-deep-main hover:bg-trans-rose hover:text-white">Beranda</button>
+                <button onclick="app.navigate('journey')" class="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-deep-main hover:bg-trans-rose hover:text-white">Perjalanan</button>
+                <button onclick="app.navigate('affirmations')" class="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-deep-main hover:bg-trans-rose hover:text-white">Afirmasi</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT AREA -->
+    <main id="app-content" class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-all duration-300">
+        <!-- Content injected by JS -->
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="glass-panel border-t border-trans-gold mt-auto">
+        <div class="max-w-7xl mx-auto py-6 px-4 overflow-hidden sm:px-6 lg:px-8">
+            <p class="text-center text-base text-gray-500 font-serif italic">
+                "Melihat dengan jujur, agar kamu tidak terus kehilangan dirimu."
+            </p>
+            <div class="mt-4 flex justify-center space-x-6 text-sm text-gray-400">
+                <span>© 2024 Catatan Pemulihan</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // --- DATA STORE ---
+        const bookData = {
+            meta: {
+                title: "10 Kesalahan Emosional",
+                subtitle: "Catatan Perempuan yang Pernah Dikhianati, Tapi Memilih Bertahan",
+                intro: "Hubungan terlarang ini ada karena aku mematikan intuisiku dengan dasar cinta. Catatan ini adalah pembangkit rasa percaya diri, melihat bahwa kita punya sisi cantik yang tidak boleh padam."
+            },
+            chapters: [
+                {
+                    id: 1,
+                    phase: "sorrow",
+                    title: "Lebih Keras pada Diriku",
+                    desc: "Saat Aku Lebih Keras pada Diriku daripada Pengkhianatan",
+                    content: "Masih terasa baru ketika dipertemukan dengan kenyataan terbongkarnya perselingkuhan itu. Pikiranku belum sempat marah, justru sibuk mencari apa yang salah dariku dan apa yang lebih buruk dari wanita selingkuhannya itu. Aku mengingat dan berpikir dengan keras tentang sikapku, ucapanku, peranku. Sungguh penuh dan penat pemikiranku hingga perlahan pengkhianatan itu aku geser menjadi “kesalahan bersama”. Aku tidak sadar bahwa dengan bersikap menyalahkan diri, itu merupakan awal aku sedang menurunkan nilai diriku sendiri.",
+                    reflection: "Apakah kesesatan pikiranku menentukan ketidaksempurnaanku? Bukankah pengkhianatan yang terjadi berawal dari celah yang dibuat pasanganku?",
+                    stat_selfWorth: 20,
+                    stat_energyDrain: 90
+                },
+                {
+                    id: 2,
+                    phase: "sorrow",
+                    title: "Mendasari Bentuk Cinta?",
+                    desc: "Bertahankah yang Mendasari Bentuk Cinta?",
+                    content: "Setelah hubungan terjalin dalam kurun waktu lebih dari tiga tahun, bentuk dari cinta sudah terkontaminasi dengan janji. Aku percaya bahwa tanpa adanya menepati maupun berpegang pada janji tidak lagi disebut hubungan. Rasa sakit juga merupakan bagian dari harga yang wajar untuk kesetiaan, setidaknya itu kata mereka yang ada di sekelilingku. Aku bertahan, tapi kehilangan diriku sendiri sedikit demi sedikit.",
+                    reflection: "Jika bertahan membuatku semakin jauh dari diriku dan menginginkan menjadi serupa dengan orang ketiga itu, apakah masih bisa disebut cinta?",
+                    stat_selfWorth: 15,
+                    stat_energyDrain: 95
+                },
+                {
+                    id: 3,
+                    phase: "sorrow",
+                    title: "Menunggu Kepastian",
+                    desc: "Menunggu Kepastian yang Tidak Pernah Benar-Benar Datang",
+                    content: "Ada tiga fase dengan pola yang pasti terjadi, yakni masalah diikuti dengan masa tunggu lalu keputusan. Bagi perempuan seperti aku, masa tunggu ini lah yang terberat. Menunggu dia berubah? Menunggu bukti baru? Aku tidak sadar bahwa menunggu juga adalah pilihan. Ironisnya pilihanku saat ini mengorbankan ketenangan batinku.",
+                    reflection: "Apa saja yang telah terenggut karena aku bersedia menunggu?",
+                    stat_selfWorth: 10,
+                    stat_energyDrain: 100
+                },
+                {
+                    id: 4,
+                    phase: "sorrow",
+                    title: "Hati Tanpa Rumah",
+                    desc: "Hati yang Tidak Punya Tempat Kembali",
+                    content: "Saat hati telah porak poranda, empati surut dengan sangat cepat. Saat kembali tersadar, aku memberi ruang pengertian pada orang lain, tapi lupa bertanya pada diri sendiri apakah aku dimengerti. Kini aku melihat ke dalam diriku yang mulai kering.",
+                    reflection: "Lebih kepada siapa empati ini seharusnya aku tujukan?",
+                    stat_selfWorth: 10,
+                    stat_energyDrain: 85
+                },
+                {
+                    id: 5,
+                    phase: "transition",
+                    title: "Aku Gagal?",
+                    desc: "Aku Gagal Karena Pengkhianatan Itu Ada",
+                    content: "Timbul pikiran: apa yang kurang dari aku? Aku mengesampingkan fakta bahwa perselingkuhan bukanlah kekurangan pasangannya, itu adalah pilihan dari pelaku secara sadar. Perempuan yang telah bersyukur seketika berubah menjadi haus akan menuntut lebih.",
+                    reflection: "Sebenarnya kesalahan yang ada bukan dari sisi milikku.",
+                    stat_selfWorth: 30,
+                    stat_energyDrain: 70
+                },
+                {
+                    id: 6,
+                    phase: "transition",
+                    title: "Hidup yang Kutunda",
+                    desc: "Hidup yang Kutunda demi Perubahan Orang Lain",
+                    content: "Aku menahan bahagia, menunda rencana dan secara tidak langsung menyerahkan hakku untuk kehidupan yang utuh pada seseorang yang belum tentu siap menjaga aku kedepannya. Aku seperti hidup dibayangan mereka semua.",
+                    reflection: "Kenapa aku menahan hidupku sendiri? Ini hidup yang hanya diberikan untukku bukan?",
+                    stat_selfWorth: 40,
+                    stat_energyDrain: 60
+                },
+                {
+                    id: 7,
+                    phase: "transition",
+                    title: "Luka Disepelekan",
+                    desc: "Tanda-Tanda Ada Luka yang Disepelekan",
+                    content: "Dia kehilangan senyum gembiranya. Nada suara juga berubah menjadi datar. Inilah luka-luka kecil yang sengaja diabaikan. Luka-luka kecil ini semakin lama dibiarkan semakin dalam bukannya menghilang. Ketenanganku sebenarnya sudah digerogoti.",
+                    reflection: "Apakah aku sedang mengabaikan luka yang lebih serius?",
+                    stat_selfWorth: 45,
+                    stat_energyDrain: 55
+                },
+                {
+                    id: 8,
+                    phase: "healing",
+                    title: "Ambang Batas",
+                    desc: "Terus Memupuk Kekuatan Sampai Ambang Batas",
+                    content: "Aku menahan tangis karena ingin terlihat kuat. Mengangkat kepala dan meluaskan hati untuk bisa menekan perasaan sakit yang tidak bisa mati. Celakanya perasaan sakit ini mencari titik untuk muncul, yaitu disaat aku dalam lelah dan dalam sunyi.",
+                    reflection: "Apakah ini terjadi karena aku menolak adanya sakit?",
+                    stat_selfWorth: 60,
+                    stat_energyDrain: 40
+                },
+                {
+                    id: 9,
+                    phase: "healing",
+                    title: "Versi Ideal Imajiner",
+                    desc: "Versi Ideal yang Imajiner",
+                    content: "Berusaha menjadi lebih sabar, lebih menyenangkan, lebih sempurna demi meraihnya kembali. Upaya ini menjadi bumerang bagi diriku yang terpuruk. Gagal menjadi versi terbaru, aku tidak merasa cukup. Padahal tidak ada versi diriku yang pantas menerima pengkhianatan.",
+                    reflection: "Standar siapa yang sebenarnya sedang kujalani?",
+                    stat_selfWorth: 75,
+                    stat_energyDrain: 30
+                },
+                {
+                    id: 10,
+                    phase: "healing",
+                    title: "Dia Tidak Menjagaku",
+                    desc: "Kesimpulan: Dia Tidak Menjagaku",
+                    content: "Dalam kesunyian, aku menyimpulkan: mungkin aku tidak layak dijaga. Pikiran ini larut karena keadaan sulit. Aku melupakan bahwa ketidakmampuan seseorang untuk setia tidak pernah menjadi ukuran nilai pasangannya. Setidaknya sekarang ada aku dan kesadaranku yang bisa menjaga.",
+                    reflection: "Berkurangnya nilai diri adalah kebodohan yang pernah tercetus semata-mata dengan tolok ukur penjagaan dari orang lain.",
+                    stat_selfWorth: 90,
+                    stat_energyDrain: 10
+                }
+            ],
+            affirmations: [
+                "Aku berhenti menyalahkan diriku atas pilihan yang dibuat orang lain.",
+                "Nilai diriku tidak pernah ditentukan oleh pengkhianatan siapa pun.",
+                "Aku berhak merasa terluka, dan tetap berharga pada saat yang sama.",
+                "Kesetiaan pada diri sendiri adalah bentuk cinta yang paling sunyi namun paling kuat.",
+                "Aku tidak perlu menjadi sempurna untuk layak dicintai dan dijaga.",
+                "Aku mempercayai intuisi dan kebutuhanku. Suaraku pantas didengar.",
+                "Aku melepaskan harapan yang melukai, dan memilih kejelasan.",
+                "Aku menetapkan batas tanpa rasa bersalah. Batas adalah caraku merawat diriku.",
+                "Aku melangkah ke depan dengan standar yang lebih jujur dan sehat.",
+                "Aku adalah perempuan yang tetap berdiri setelah kehilangan, dan itu cukup."
+            ]
+        };
+
+        const phases = {
+            sorrow: { name: "Deep Sorrow", color: "#1A1A2E", text: "text-gray-100", bg: "bg-deep-main", border: "border-deep-sec", accent: "#16213E" },
+            transition: { name: "The Transition", color: "#906387", text: "text-white", bg: "bg-trans-rose", border: "border-trans-gold", accent: "#C3A6A0" },
+            healing: { name: "Healing Light", color: "#B8C1A0", text: "text-gray-800", bg: "bg-light-sage", border: "border-light-lav", accent: "#E5D9F2" }
+        };
+
+        // --- APP CONTROLLER ---
+        const app = {
+            state: {
+                currentView: 'home',
+                activeChapterId: null,
+                reflections: {}
+            },
+
+            init: function() {
+                this.navigate('home');
+                // Load saved reflections
+                const saved = localStorage.getItem('healing_reflections');
+                if (saved) this.state.reflections = JSON.parse(saved);
+            },
+
+            navigate: function(view) {
+                this.state.currentView = view;
+                this.updateNavUI();
+                const container = document.getElementById('app-content');
+                container.innerHTML = ''; // Clear content
+                container.classList.remove('fade-in');
+                void container.offsetWidth; // Trigger reflow
+                container.classList.add('fade-in');
+
+                if (view === 'home') this.renderHome(container);
+                else if (view === 'journey') this.renderJourney(container);
+                else if (view === 'affirmations') this.renderAffirmations(container);
+            },
+
+            updateNavUI: function() {
+                document.querySelectorAll('nav button').forEach(btn => {
+                    const isActive = btn.id === `nav-${this.state.currentView}`;
+                    btn.className = isActive 
+                        ? "active-tab px-1 pt-1 text-sm uppercase tracking-widest transition" 
+                        : "inactive-tab px-1 pt-1 text-sm uppercase tracking-widest transition";
+                });
+            },
+
+            // --- VIEW: HOME ---
+            renderHome: function(container) {
+                const html = `
+                    <div class="text-center py-12 px-4">
+                        <h1 class="font-serif text-5xl md:text-6xl text-deep-main font-bold mb-4 italic leading-tight">${bookData.meta.title}</h1>
+                        <div class="kintsugi-scar" style="left:50%; top:20px;"></div>
+                        <p class="text-xl md:text-2xl text-trans-rose font-light tracking-wide mb-8 max-w-2xl mx-auto">${bookData.meta.subtitle}</p>
+                        <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-lg border-t-4 border-trans-gold">
+                            <p class="text-lg text-gray-600 leading-relaxed mb-6">"${bookData.meta.intro}"</p>
+                            <button onclick="app.navigate('journey')" class="bg-deep-main text-white px-8 py-3 rounded-full hover:bg-trans-rose transition shadow-md font-serif italic tracking-wider">
+                                Mulai Perjalanan
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- INSIGHTS CHART -->
+                    <div class="mt-16 mb-8">
+                        <div class="text-center mb-8">
+                            <h2 class="text-3xl font-serif text-deep-main">Peta Emosional</h2>
+                            <p class="text-gray-500">Analisis visual energi yang terkuras vs. pulihnya harga diri.</p>
+                        </div>
+                        <div class="chart-container glass-panel rounded-xl p-4 shadow-sm">
+                            <canvas id="emotionChart"></canvas>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = html;
+                this.initChart();
+            },
+
+            // --- VIEW: JOURNEY ---
+            renderJourney: function(container) {
+                let html = `
+                    <div class="mb-10 text-center">
+                        <h2 class="text-4xl font-serif text-deep-main mb-2">Jejak Langkah</h2>
+                        <p class="text-gray-500">Pilih kartu untuk mendalami setiap fase pemulihan.</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                `;
+
+                bookData.chapters.forEach(ch => {
+                    const p = phases[ch.phase];
+                    const isCompleted = this.state.reflections[ch.id] ? '✨' : '';
+                    html += `
+                        <div onclick="app.openChapter(${ch.id})" class="group cursor-pointer relative bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 overflow-hidden border-b-4" style="border-color: ${p.color}">
+                            <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition text-6xl font-serif font-bold text-gray-300">${ch.id}</div>
+                            <div class="p-6 h-full flex flex-col">
+                                <span class="text-xs font-bold uppercase tracking-wider mb-2" style="color: ${p.color}">${p.name}</span>
+                                <h3 class="text-xl font-serif font-bold text-gray-800 mb-3 group-hover:text-trans-rose transition">${ch.title} ${isCompleted}</h3>
+                                <p class="text-sm text-gray-500 line-clamp-3 mb-4 flex-grow">${ch.content}</p>
+                                <div class="flex items-center text-sm font-medium" style="color: ${p.color}">
+                                    Baca & Refleksi 
+                                    <span class="ml-2 group-hover:translate-x-1 transition">→</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+                
+                // Chapter Modal Container
+                html += `<div id="chapter-modal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div class="fixed inset-0 bg-deep-main bg-opacity-75 transition-opacity" onclick="app.closeChapter()"></div>
+                        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                            <div id="modal-content"></div>
+                        </div>
+                    </div>
+                </div>`;
+
+                container.innerHTML = html;
+            },
+
+            openChapter: function(id) {
+                const ch = bookData.chapters.find(c => c.id === id);
+                const p = phases[ch.phase];
+                const savedRef = this.state.reflections[id] || '';
+                
+                const modalHtml = `
+                    <div class="bg-white">
+                        <div class="px-4 py-5 sm:px-6" style="background-color: ${p.color}; color: ${ch.phase === 'sorrow' ? '#E0E0E0' : (ch.phase === 'transition' ? '#FFF' : '#2D3436')}">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg leading-6 font-medium uppercase tracking-wider opacity-80">Bab ${ch.id} • ${p.name}</h3>
+                                <button onclick="app.closeChapter()" class="text-2xl hover:opacity-75">×</button>
+                            </div>
+                            <h2 class="text-2xl sm:text-3xl font-serif font-bold mt-2">${ch.title}</h2>
+                        </div>
+                        <div class="px-4 py-6 sm:p-8">
+                            <h4 class="text-lg font-serif italic text-gray-500 mb-6 border-l-4 pl-4" style="border-color: ${p.color}">${ch.desc}</h4>
+                            <p class="text-gray-700 leading-relaxed text-lg mb-8 text-justify">${ch.content}</p>
+                            
+                            <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                                <label class="block text-sm font-medium text-trans-rose mb-2 font-serif italic">Refleksi untuk Hatimu:</label>
+                                <p class="text-deep-main font-semibold mb-4">${ch.reflection}</p>
+                                <textarea id="ref-input-${id}" rows="4" class="shadow-sm focus:ring-trans-rose focus:border-trans-rose block w-full sm:text-sm border-gray-300 rounded-md p-3" placeholder="Tulis jawabanmu di sini untuk melepaskan beban..." oninput="app.saveReflection(${id}, this.value)">${savedRef}</textarea>
+                                <p class="text-xs text-gray-400 mt-2 text-right">*Jawaban tersimpan otomatis di browser ini.</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="button" onclick="app.closeChapter()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-deep-main text-base font-medium text-white hover:bg-gray-800 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
+                                Selesai Baca
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('modal-content').innerHTML = modalHtml;
+                document.getElementById('chapter-modal').classList.remove('hidden');
+            },
+
+            closeChapter: function() {
+                document.getElementById('chapter-modal').classList.add('hidden');
+                // Refresh journey view to show checkmarks
+                this.renderJourney(document.getElementById('app-content'));
+            },
+
+            saveReflection: function(id, text) {
+                this.state.reflections[id] = text;
+                localStorage.setItem('healing_reflections', JSON.stringify(this.state.reflections));
+            },
+
+            // --- VIEW: AFFIRMATIONS ---
+            renderAffirmations: function(container) {
+                const html = `
+                    <div class="min-h-[60vh] flex flex-col items-center justify-center text-center">
+                        <h2 class="text-3xl font-serif text-deep-main mb-8">Ruang Kekuatan</h2>
+                        
+                        <div id="affirmation-card" class="bg-white max-w-xl w-full p-10 rounded-2xl shadow-xl border border-light-lav transform transition-all duration-500 cursor-pointer hover:shadow-2xl relative overflow-hidden" onclick="app.newAffirmation()">
+                            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-light-lav to-light-sage"></div>
+                            <div class="text-6xl text-trans-gold font-serif opacity-20 absolute top-4 left-4">“</div>
+                            <p id="aff-text" class="text-2xl text-gray-700 font-serif leading-relaxed my-8 fade-in">
+                                Klik kartu ini untuk mendapatkan pesan kekuatanmu hari ini.
+                            </p>
+                            <div class="text-6xl text-trans-gold font-serif opacity-20 absolute bottom-4 right-4">”</div>
+                            <div class="mt-6">
+                                <span class="text-xs font-bold text-trans-rose uppercase tracking-widest">Sentuh untuk Ganti</span>
+                            </div>
+                        </div>
+
+                        <div class="mt-12 text-sm text-gray-500">
+                            "Letakkan tangan di dada, tarik napas dalam, dan bacalah dengan suara lembut."
+                        </div>
+                    </div>
+                `;
+                container.innerHTML = html;
+                // Auto load first one
+                setTimeout(() => this.newAffirmation(), 500);
+            },
+
+            newAffirmation: function() {
+                const card = document.getElementById('aff-text');
+                const cardContainer = document.getElementById('affirmation-card');
+                
+                // Animate out
+                card.style.opacity = 0;
+                cardContainer.classList.add('scale-95');
+                
+                setTimeout(() => {
+                    const random = bookData.affirmations[Math.floor(Math.random() * bookData.affirmations.length)];
+                    card.innerText = random;
+                    // Animate in
+                    card.style.opacity = 1;
+                    cardContainer.classList.remove('scale-95');
+                }, 200);
+            },
+
+            // --- CHARTS ---
+            initChart: function() {
+                const ctx = document.getElementById('emotionChart').getContext('2d');
+                
+                // Gradient for Energy Drain (Red/Dark)
+                const gradDrain = ctx.createLinearGradient(0, 0, 0, 400);
+                gradDrain.addColorStop(0, 'rgba(26, 26, 46, 0.6)'); // Deep color
+                gradDrain.addColorStop(1, 'rgba(26, 26, 46, 0.0)');
+
+                // Gradient for Self Worth (Gold/Light)
+                const gradWorth = ctx.createLinearGradient(0, 0, 0, 400);
+                gradWorth.addColorStop(0, 'rgba(195, 166, 160, 0.6)'); // Gold
+                gradWorth.addColorStop(1, 'rgba(195, 166, 160, 0.0)');
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: bookData.chapters.map(c => `Bab ${c.id}`),
+                        datasets: [
+                            {
+                                label: 'Terkurasnya Energi',
+                                data: bookData.chapters.map(c => c.stat_energyDrain),
+                                borderColor: '#1A1A2E', // Deep Sorrow color
+                                backgroundColor: gradDrain,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#1A1A2E'
+                            },
+                            {
+                                label: 'Pulihnya Harga Diri',
+                                data: bookData.chapters.map(c => c.stat_selfWorth),
+                                borderColor: '#C3A6A0', // Transition Gold
+                                backgroundColor: gradWorth,
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#C3A6A0'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            tooltip: {
+                                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                                titleColor: '#1A1A2E',
+                                bodyColor: '#2D3436',
+                                borderColor: '#C3A6A0',
+                                borderWidth: 1,
+                                padding: 10,
+                                titleFont: { family: "'Playfair Display', serif", size: 14 },
+                                bodyFont: { family: "'Montserrat', sans-serif" }
+                            },
+                            legend: {
+                                labels: {
+                                    font: { family: "'Montserrat', sans-serif" },
+                                    usePointStyle: true
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: { font: { family: "'Montserrat', sans-serif" } }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { family: "'Montserrat', sans-serif" } }
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
+        // Start App
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>
